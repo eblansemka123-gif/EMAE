@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Elite Voxel Engine V4 | Multiplayer Combat</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background-color: #87CEEB; color: #00ffcc; font-family: 'Consolas', monospace; }
+        
+        #game-interface { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
+        
+        #joystick-area { position: absolute; bottom: 10px; left: 50px; width: 160px; height: 160px; background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(0,0,0,0) 70%); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; pointer-events: auto; }
+        #joystick-handle { position: absolute; top: 50%; left: 50%; width: 60px; height: 60px; background: rgba(255, 255, 255, 0.6); box-shadow: 0 0 15px #fff; border-radius: 50%; transform: translate(-50%, -50%); }
+        
+        #sprint-btn { 
+            position: absolute; bottom: 60px; right: 50px; width: 80px; height: 80px; 
+            background: rgba(0, 255, 204, 0.2); border: 2px solid #00ffcc; border-radius: 50%; 
+            pointer-events: auto; display: flex; align-items: center; justify-content: center; 
+            color: #00ffcc; font-weight: bold; text-shadow: 0 0 5px #00ffcc; 
+            box-shadow: 0 0 10px rgba(0,255,204,0.3); cursor: pointer; z-index: 20;
+        }
+        #sprint-btn:active { background: rgba(0, 255, 204, 0.5); transform: scale(0.95); }
+
+        #aim-btn { 
+            position: absolute; bottom: 160px; right: 50px; width: 70px; height: 70px; 
+            background: rgba(255, 100, 100, 0.2); border: 2px solid #ff6666; border-radius: 50%; 
+            pointer-events: auto; display: flex; align-items: center; justify-content: center; 
+            color: #ffaaaa; font-weight: bold; text-shadow: 0 0 5px #ff6666; 
+            box-shadow: 0 0 10px rgba(255,100,100,0.3); cursor: pointer; z-index: 20;
+            transition: background 0.1s;
+        }
+        #aim-btn.active { background: rgba(255, 100, 100, 0.6); }
+
+        #fire-btn { 
+            position: absolute; top: 20px; left: 30px; width: 140px; height: 140px; 
+            background: rgba(255, 215, 0, 0.15); border: 3px solid #ffaa00; border-radius: 50%; 
+            pointer-events: auto; display: flex; align-items: center; justify-content: center; 
+            color: #ffdd44; font-weight: bold; font-size: 24px; text-shadow: 0 0 8px orange; 
+            box-shadow: 0 0 20px rgba(255,165,0,0.5); cursor: pointer; z-index: 25;
+        }
+        #fire-btn:active { background: rgba(255, 215, 0, 0.4); transform: scale(0.92); }
+
+        #camera-touch-surface { position: absolute; top: 0; right: 0; width: 70%; height: 100%; pointer-events: auto; }
+        
+        #hud-terminal { position: absolute; top: 20px; right: 20px; text-align: right; font-size: 10px; line-height: 1.2; color: #000; font-weight: bold; text-shadow: 1px 1px 2px rgba(255,255,255,0.5); }
+        #render-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: rgba(255,255,255,0.9);
+            border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 8px red;
+            pointer-events: none; z-index: 30; display: none; border: 1px solid rgba(0,0,0,0.5);
+        }
+        #crosshair::before {
+            content: ''; position: absolute; top: 50%; left: -12px; width: 10px; height: 2px;
+            background: white; transform: translateY(-50%); box-shadow: 0 0 4px red;
+        }
+        #crosshair::after {
+            content: ''; position: absolute; top: 50%; right: -12px; width: 10px; height: 2px;
+            background: white; transform: translateY(-50%); box-shadow: 0 0 4px red;
+        }
+        #crosshair .v-line {
+            position: absolute; left: 50%; top: -12px; width: 2px; height: 10px; background: white;
+            transform: translateX(-50%); box-shadow: 0 0 4px red;
+        }
+        #crosshair .v-line2 {
+            position: absolute; left: 50%; bottom: -12px; width: 2px; height: 10px; background: white;
+            transform: translateX(-50%); box-shadow: 0 0 4px red;
+        }
+
+        #edit-mode-toggle {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid #00ffcc;
+            border-radius: 12px;
+            color: #00ffcc;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            z-index: 100;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            transition: all 0.2s;
+        }
+        #edit-mode-toggle.active {
+            background: #00ffcc;
+            color: black;
+            box-shadow: 0 0 20px #00ffcc;
+        }
+
+        .edit-mode .draggable {
+            outline: 3px dashed #00ffcc !important;
+            box-shadow: 0 0 15px #00ffcc !important;
+            transition: none !important;
+            cursor: move !important;
+            touch-action: none;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="render-container"></div>
+    <div id="crosshair">
+        <div class="v-line"></div>
+        <div class="v-line2"></div>
+    </div>
+
+    <div id="game-interface">
+        <div id="edit-mode-toggle">⚙️</div>
+        <div id="hud-terminal">
+            OS: VOXEL_ARCH_V4_MP<br>
+            COMBAT_SYSTEM: ONLINE<br>
+            WEAPON: HEAVY_PISTOL<br>
+            HEALTH: <span id="health-value">100</span>/100
+        </div>
+        <div id="fire-btn" class="draggable">FIRE</div>
+        <div id="joystick-area" class="draggable"><div id="joystick-handle"></div></div>
+        <div id="aim-btn" class="draggable">AIM</div>
+        <div id="sprint-btn" class="draggable">RUN</div>
+        <div id="camera-touch-surface"></div>
+    </div>
+
+    <script>
+        // ==========================================
+        // ТАКТИЧЕСКАЯ АУДИОСИСТЕМА
+        // ==========================================
+        class TacticalAudioSystem {
+            constructor() {
+                this.initialized = false;
+                this.ctx = null;
+                const unlock = () => {
+                    if(!this.initialized) {
+                        try {
+                            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                            if (this.ctx.state === 'suspended') this.ctx.resume();
+                            this.initialized = true;
+                        } catch(e) { console.warn("AudioContext fallback."); }
+                    }
+                    document.removeEventListener('touchstart', unlock);
+                };
+                document.addEventListener('touchstart', unlock);
+            }
+
+            playGunshot() {
+                if (this.ctx && this.ctx.state === 'running') {
+                    try {
+                        const t = this.ctx.currentTime;
+                        const osc = this.ctx.createOscillator();
+                        const gainOsc = this.ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(180, t);
+                        osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.12);
+                        gainOsc.gain.setValueAtTime(0.9, t);
+                        gainOsc.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+                        osc.connect(gainOsc);
+                        gainOsc.connect(this.ctx.destination);
+                        osc.start(t);
+                        osc.stop(t + 0.12);
+
+                        const bufferSize = this.ctx.sampleRate * 0.2;
+                        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                        const data = buffer.getChannelData(0);
+                        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                        const noise = this.ctx.createBufferSource();
+                        noise.buffer = buffer;
+                        const gainNoise = this.ctx.createGain();
+                        const filter = this.ctx.createBiquadFilter();
+                        filter.type = 'highpass';
+                        filter.frequency.value = 1000;
+                        gainNoise.gain.setValueAtTime(0.7, t);
+                        gainNoise.gain.exponentialRampToValueAtTime(0.01, t + 0.18);
+                        noise.connect(filter);
+                        filter.connect(gainNoise);
+                        gainNoise.connect(this.ctx.destination);
+                        noise.start(t);
+                    } catch(e) {}
+                }
+            }
+        }
+
+        // ==========================================
+        // ПРОДВИНУТЫЙ МЕНЕДЖЕР ЭФФЕКТОВ (ТРАССЕРЫ, ЧАСТИЦЫ, ДЫМ)
+        // ==========================================
+        class CombatFXManager {
+            constructor(scene) {
+                this.scene = scene;
+                this.tracers = [];
+                this.particles = [];
+                this.decals = [];
+                
+                this.tracerMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.9 });
+                this.tracerGeom = new THREE.CylinderGeometry(0.03, 0.03, 1, 6);
+                this.tracerGeom.rotateX(Math.PI / 2);
+
+                this.particleMat = new THREE.MeshLambertMaterial({ color: 0xaaaaaa });
+                this.particleGeom = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+                this.smokeMat = new THREE.MeshBasicMaterial({ color: 0xcccccc, transparent: true, opacity: 0.4 });
+                this.smokeGeom = new THREE.SphereGeometry(0.15, 3);
+
+                this.decalMat = new THREE.MeshBasicMaterial({ color: 0x111111, depthWrite: false });
+                this.decalGeom = new THREE.PlaneGeometry(0.25, 0.25);
+            }
+
+            spawnTracer(startPos, endPos) {
+                const distance = startPos.distanceTo(endPos);
+                const tracer = new THREE.Mesh(this.tracerGeom, this.tracerMat.clone());
+                tracer.material.opacity = 0.9;
+                const tracerLength = Math.min(distance, 12);
+                tracer.scale.set(1, 1, tracerLength);
+                const dir = new THREE.Vector3().subVectors(endPos, startPos).normalize();
+                const midPoint = new THREE.Vector3().copy(startPos).add(dir.clone().multiplyScalar(tracerLength / 2));
+                tracer.position.copy(midPoint);
+                tracer.lookAt(endPos);
+                this.scene.add(tracer);
+                this.tracers.push({ mesh: tracer, life: 1.0 });
+            }
+
+            spawnImpact(position, normal) {
+                const count = 8 + Math.floor(Math.random() * 6);
+                for (let i = 0; i < count; i++) {
+                    const particle = new THREE.Mesh(this.particleGeom, this.particleMat);
+                    particle.position.copy(position.clone().add(normal.clone().multiplyScalar(0.1)));
+                    const bounce = normal.clone().add(new THREE.Vector3(
+                        (Math.random() - 0.5) * 2.5,
+                        Math.random() * 2,
+                        (Math.random() - 0.5) * 2.5
+                    )).normalize().multiplyScalar(Math.random() * 6 + 4);
+                    this.scene.add(particle);
+                    this.particles.push({ mesh: particle, vel: bounce, life: 1.0 });
+                }
+                for (let i = 0; i < 3; i++) {
+                    const smoke = new THREE.Mesh(this.smokeGeom, this.smokeMat.clone());
+                    smoke.position.copy(position.clone().add(normal.clone().multiplyScalar(0.2)));
+                    smoke.scale.setScalar(0.8);
+                    this.scene.add(smoke);
+                    this.particles.push({ mesh: smoke, vel: new THREE.Vector3(0, 0.5 + Math.random(), 0), life: 1.0, isSmoke: true });
+                }
+            }
+
+            spawnBulletHole(position, normal) {
+                const decal = new THREE.Mesh(this.decalGeom, this.decalMat);
+                decal.position.copy(position).add(normal.clone().multiplyScalar(0.02));
+                const targetLookAt = position.clone().add(normal);
+                decal.lookAt(targetLookAt);
+                decal.rotation.z = Math.random() * Math.PI * 2;
+                this.scene.add(decal);
+                this.decals.push(decal);
+                if (this.decals.length > 60) {
+                    const old = this.decals.shift();
+                    this.scene.remove(old);
+                }
+            }
+
+            update(dt) {
+                for (let i = this.tracers.length - 1; i >= 0; i--) {
+                    let t = this.tracers[i];
+                    t.life -= dt * 12;
+                    t.mesh.material.opacity = t.life * 0.9;
+                    t.mesh.translateZ(dt * 70);
+                    if (t.life <= 0) {
+                        this.scene.remove(t.mesh);
+                        this.tracers.splice(i, 1);
+                    }
+                }
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    let p = this.particles[i];
+                    if (p.isSmoke) {
+                        p.vel.y += dt * 1.5;
+                        p.mesh.position.add(p.vel.clone().multiplyScalar(dt));
+                        p.life -= dt * 0.8;
+                        p.mesh.scale.setScalar(1 + (1 - p.life) * 2);
+                        p.mesh.material.opacity = p.life * 0.4;
+                    } else {
+                        p.vel.y -= 12 * dt;
+                        p.mesh.position.add(p.vel.clone().multiplyScalar(dt));
+                        p.mesh.rotation.x += dt * p.vel.z;
+                        p.mesh.rotation.y += dt * p.vel.x;
+                        p.life -= dt * 2.2;
+                        p.mesh.scale.setScalar(p.life);
+                    }
+                    if (p.life <= 0) {
+                        this.scene.remove(p.mesh);
+                        this.particles.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // МУЛЬТИТАЧ-КОНТРОЛЛЕР
+        // ==========================================
+        class MultiTouchController {
+            constructor() {
+                this.moveDir = new THREE.Vector2(0, 0);
+                this.camDelta = new THREE.Vector2(0, 0);
+                this.isSprinting = false;
+                this.isAiming = false;
+                this.isFiring = false;
+                this.joyTouchId = null;
+                this.camTouchId = null;
+                this.sprintTouchId = null;
+                this.fireTouchId = null;
+                this.lastCamPos = { x: 0, y: 0 };
+                this.editModeActive = false;
+                this.initListeners();
+            }
+
+            setEditMode(active) {
+                this.editModeActive = active;
+            }
+
+            initListeners() {
+                const joyArea = document.getElementById('joystick-area');
+                const camArea = document.getElementById('camera-touch-surface');
+                const sprintBtn = document.getElementById('sprint-btn');
+                const aimBtn = document.getElementById('aim-btn');
+                const fireBtn = document.getElementById('fire-btn');
+                const handle = document.getElementById('joystick-handle');
+
+                const onTouchStart = (e) => {
+                    if (this.editModeActive) return;
+                    e.preventDefault();
+                    for (let touch of e.changedTouches) {
+                        const target = touch.target;
+                        if (this.joyTouchId === null && (target === joyArea || target === handle)) {
+                            this.joyTouchId = touch.identifier;
+                            this.updateJoystick(touch, joyArea, handle);
+                        } else if (sprintBtn.contains(target)) {
+                            this.sprintTouchId = touch.identifier;
+                            this.isSprinting = true;
+                        } else if (aimBtn.contains(target)) {
+                            this.isAiming = !this.isAiming;
+                            aimBtn.classList.toggle('active', this.isAiming);
+                        } else if (fireBtn.contains(target)) {
+                            this.fireTouchId = touch.identifier;
+                            this.isFiring = true;
+                        } else if (this.camTouchId === null && camArea.contains(target)) {
+                            this.camTouchId = touch.identifier;
+                            this.lastCamPos = { x: touch.clientX, y: touch.clientY };
+                        }
+                    }
+                };
+
+                const onTouchMove = (e) => {
+                    if (this.editModeActive) return;
+                    e.preventDefault();
+                    for (let touch of e.changedTouches) {
+                        if (touch.identifier === this.joyTouchId) {
+                            this.updateJoystick(touch, joyArea, handle);
+                        } else if (touch.identifier === this.camTouchId) {
+                            this.camDelta.x = touch.clientX - this.lastCamPos.x;
+                            this.camDelta.y = touch.clientY - this.lastCamPos.y;
+                            this.lastCamPos = { x: touch.clientX, y: touch.clientY };
+                        }
+                    }
+                };
+
+                const onTouchEnd = (e) => {
+                    if (this.editModeActive) return;
+                    e.preventDefault();
+                    for (let touch of e.changedTouches) {
+                        if (touch.identifier === this.joyTouchId) {
+                            this.joyTouchId = null;
+                            this.moveDir.set(0, 0);
+                            handle.style.transform = 'translate(-50%, -50%)';
+                        } else if (touch.identifier === this.camTouchId) {
+                            this.camTouchId = null;
+                        } else if (touch.identifier === this.sprintTouchId) {
+                            this.sprintTouchId = null;
+                            this.isSprinting = false;
+                        } else if (touch.identifier === this.fireTouchId) {
+                            this.fireTouchId = null;
+                            this.isFiring = false;
+                        }
+                    }
+                };
+
+                window.addEventListener('touchstart', onTouchStart, { passive: false });
+                window.addEventListener('touchmove', onTouchMove, { passive: false });
+                window.addEventListener('touchend', onTouchEnd);
+                window.addEventListener('touchcancel', onTouchEnd);
+            }
+
+            updateJoystick(touch, area, handle) {
+                const rect = area.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const maxDist = rect.width / 2;
+                let dx = touch.clientX - centerX;
+                let dy = touch.clientY - centerY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > maxDist) {
+                    dx = (dx / dist) * maxDist;
+                    dy = (dy / dist) * maxDist;
+                }
+                handle.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                this.moveDir.set(dx / maxDist, dy / maxDist);
+            }
+        }
+
+        // ==========================================
+        // МЕНЕДЖЕР РЕЖИМА РЕДАКТИРОВАНИЯ
+        // ==========================================
+        class EditModeManager {
+            constructor(container, controller) {
+                this.container = container;
+                this.controller = controller;
+                this.active = false;
+                this.draggableElements = [];
+                this.currentDrag = null;
+                this.startX = 0;
+                this.startY = 0;
+                this.startLeft = 0;
+                this.startTop = 0;
+                
+                this.toggleBtn = document.getElementById('edit-mode-toggle');
+                this.toggleBtn.addEventListener('click', () => this.toggle());
+                
+                this.draggableElements = Array.from(document.querySelectorAll('.draggable'));
+                
+                this.onTouchStart = this.onTouchStart.bind(this);
+                this.onTouchMove = this.onTouchMove.bind(this);
+                this.onTouchEnd = this.onTouchEnd.bind(this);
+            }
+            
+            toggle() {
+                this.active = !this.active;
+                this.controller.setEditMode(this.active);
+                if (this.active) {
+                    this.container.classList.add('edit-mode');
+                    this.toggleBtn.classList.add('active');
+                    this.container.addEventListener('touchstart', this.onTouchStart, { passive: false });
+                    this.container.addEventListener('touchmove', this.onTouchMove, { passive: false });
+                    this.container.addEventListener('touchend', this.onTouchEnd);
+                    this.container.addEventListener('touchcancel', this.onTouchEnd);
+                } else {
+                    this.container.classList.remove('edit-mode');
+                    this.toggleBtn.classList.remove('active');
+                    this.container.removeEventListener('touchstart', this.onTouchStart);
+                    this.container.removeEventListener('touchmove', this.onTouchMove);
+                    this.container.removeEventListener('touchend', this.onTouchEnd);
+                    this.container.removeEventListener('touchcancel', this.onTouchEnd);
+                    this.currentDrag = null;
+                }
+            }
+            
+            onTouchStart(e) {
+                if (!this.active) return;
+                const touch = e.touches[0];
+                const target = touch.target.closest('.draggable');
+                if (!target) return;
+                e.preventDefault();
+                e.stopPropagation();
+                
+                this.currentDrag = target;
+                const rect = target.getBoundingClientRect();
+                this.startX = touch.clientX;
+                this.startY = touch.clientY;
+                this.startLeft = rect.left;
+                this.startTop = rect.top;
+                
+                target.style.transition = 'none';
+            }
+            
+            onTouchMove(e) {
+                if (!this.active || !this.currentDrag) return;
+                e.preventDefault();
+                e.stopPropagation();
+                const touch = e.touches[0];
+                const dx = touch.clientX - this.startX;
+                const dy = touch.clientY - this.startY;
+                
+                let newLeft = this.startLeft + dx;
+                let newTop = this.startTop + dy;
+                
+                const elemRect = this.currentDrag.getBoundingClientRect();
+                const maxX = window.innerWidth - elemRect.width;
+                const maxY = window.innerHeight - elemRect.height;
+                newLeft = Math.max(0, Math.min(newLeft, maxX));
+                newTop = Math.max(0, Math.min(newTop, maxY));
+                
+                this.currentDrag.style.left = newLeft + 'px';
+                this.currentDrag.style.top = newTop + 'px';
+                this.currentDrag.style.right = 'auto';
+                this.currentDrag.style.bottom = 'auto';
+            }
+            
+            onTouchEnd(e) {
+                if (!this.active || !this.currentDrag) return;
+                e.preventDefault();
+                e.stopPropagation();
+                this.currentDrag.style.transition = '';
+                this.currentDrag = null;
+            }
+        }
+
+        // ==========================================
+        // ПРОРАБОТАННЫЙ ВОКСЕЛЬНЫЙ ГЕРОЙ + ДЕТАЛИЗИРОВАННЫЙ ПИСТОЛЕТ
+        // ==========================================
+        class AdvancedVoxelHero {
+            constructor(scene, customMaterials = null) {
+                this.root = new THREE.Group();
+                this.mats = customMaterials || {
+                    skin: new THREE.MeshLambertMaterial({ color: 0xffdbac }),
+                    cloth: new THREE.MeshLambertMaterial({ color: 0x1a1a1a }),
+                    accent: new THREE.MeshLambertMaterial({ color: 0x00ffcc }),
+                    hair: new THREE.MeshLambertMaterial({ color: 0x331100 }),
+                    white: new THREE.MeshLambertMaterial({ color: 0xffffff }),
+                    black: new THREE.MeshLambertMaterial({ color: 0x000000 }),
+                    shoe: new THREE.MeshLambertMaterial({ color: 0x111111 }),
+                    gunMetal: new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.3, metalness: 0.8 }),
+                    gunGrip: new THREE.MeshStandardMaterial({ color: 0x3a1e0a, roughness: 0.9 }),
+                    gunSlide: new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.5, metalness: 0.6 }),
+                    muzzleFlash: new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.95 })
+                };
+                this.buildModel();
+                scene.add(this.root);
+                this.animTimer = 0;
+                
+                this.weaponGroup = new THREE.Group();
+                this.armR.add(this.weaponGroup);
+                this.createDetailedWeapon();
+                
+                this.slideOffset = 0;
+                this.originalSlidePos = new THREE.Vector3(0, 0.33, 0.1);
+                this.slideMesh = null;
+            }
+
+            box(w, h, d, mat, x=0, y=0, z=0) {
+                const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+                m.position.set(x, y, z);
+                m.castShadow = true;
+                m.receiveShadow = true;
+                return m;
+            }
+
+            createDetailedWeapon() {
+                const frame = this.box(0.2, 0.3, 0.7, this.mats.gunMetal, 0, 0.2, 0.1);
+                this.slideMesh = this.box(0.18, 0.14, 0.65, this.mats.gunSlide, 0, 0.35, 0.1);
+                const grip = this.box(0.18, 0.45, 0.25, this.mats.gunGrip, 0, -0.12, -0.05);
+                const barrel = this.box(0.1, 0.1, 0.5, this.mats.gunMetal, 0, 0.3, 0.4);
+                const frontSight = this.box(0.04, 0.06, 0.04, this.mats.black, 0, 0.42, 0.5);
+                const rearSight = this.box(0.06, 0.08, 0.06, this.mats.black, 0, 0.42, 0.25);
+                const trigger = this.box(0.04, 0.12, 0.04, this.mats.gunMetal, 0, 0.15, -0.1);
+                const mag = this.box(0.16, 0.3, 0.22, this.mats.black, 0, -0.25, -0.05);
+                
+                this.weaponGroup.add(frame, this.slideMesh, grip, barrel, frontSight, rearSight, trigger, mag);
+                
+                this.muzzleFlashObj = this.box(0.3, 0.25, 0.4, this.mats.muzzleFlash, 0, 0.3, 0.8);
+                this.muzzleFlashObj.visible = false;
+                this.weaponGroup.add(this.muzzleFlashObj);
+                
+                this.muzzlePoint = new THREE.Object3D();
+                this.muzzlePoint.position.set(0, 0.3, 0.7);
+                this.weaponGroup.add(this.muzzlePoint);
+                
+                this.weaponGroup.position.set(0.05, -0.85, 0.25);
+                this.weaponGroup.rotation.x = -Math.PI / 2.2;
+                this.weaponGroup.rotation.y = 0.05;
+                this.weaponGroup.rotation.z = -0.05;
+            }
+
+            buildModel() {
+                this.torso = this.box(0.95, 1.3, 0.55, this.mats.cloth, 0, 1.4, 0);
+                const belt = this.box(1.0, 0.15, 0.6, this.mats.accent, 0, -0.5, 0);
+                this.torso.add(belt);
+                this.root.add(this.torso);
+
+                this.headContainer = new THREE.Group();
+                this.headContainer.position.y = 0.65;
+                this.torso.add(this.headContainer);
+                const skull = this.box(0.75, 0.75, 0.75, this.mats.skin, 0, 0.35, 0);
+                this.headContainer.add(skull);
+                skull.add(this.box(0.8, 0.3, 0.8, this.mats.hair, 0, 0.3, 0));
+                
+                const eyeL = this.box(0.16, 0.16, 0.05, this.mats.white, -0.22, 0.1, 0.38);
+                eyeL.add(this.box(0.08, 0.08, 0.02, this.mats.black, 0, 0, 0.03));
+                const eyeR = this.box(0.16, 0.16, 0.05, this.mats.white, 0.22, 0.1, 0.38);
+                eyeR.add(this.box(0.08, 0.08, 0.02, this.mats.black, 0, 0, 0.03));
+                skull.add(eyeL, eyeR);
+                skull.add(this.box(0.1, 0.14, 0.1, this.mats.skin, 0, 0, 0.4));
+                skull.add(this.box(0.25, 0.05, 0.05, this.mats.black, 0, -0.15, 0.38));
+
+                this.armL = this.createHand(-1);
+                this.armR = this.createHand(1);
+                this.torso.add(this.armL, this.armR);
+
+                this.legL = this.createLeg(-1);
+                this.legR = this.createLeg(1);
+                this.torso.add(this.legL, this.legR);
+            }
+
+            createHand(side) {
+                const g = new THREE.Group();
+                g.position.set(side * 0.7, 0.4, 0);
+                g.add(this.box(0.32, 0.95, 0.32, this.mats.skin, 0, -0.35, 0));
+                const palm = this.box(0.34, 0.22, 0.34, this.mats.skin, 0, -0.85, 0);
+                palm.add(this.box(0.06, 0.12, 0.06, this.mats.skin, 0.12, -0.1, 0.12));
+                palm.add(this.box(0.06, 0.12, 0.06, this.mats.skin, -0.12, -0.1, 0.12));
+                g.add(palm);
+                return g;
+            }
+
+            createLeg(side) {
+                const g = new THREE.Group();
+                g.position.set(side * 0.28, -0.6, 0);
+                g.add(this.box(0.4, 1.05, 0.4, this.mats.cloth, 0, -0.4, 0));
+                const shoe = this.box(0.45, 0.28, 0.65, this.mats.shoe, 0, -0.95, 0.12);
+                shoe.add(this.box(0.45, 0.06, 0.65, this.mats.accent, 0, -0.1, 0));
+                g.add(shoe);
+                return g;
+            }
+
+            animate(moving, dt, sprint) {
+                const speedMult = sprint ? 1.8 : 1.0;
+                if (moving) {
+                    this.animTimer += dt * 8 * speedMult;
+                    const s = Math.sin(this.animTimer);
+                    this.armL.rotation.x = s * 0.8;
+                    if (!document.getElementById('aim-btn').classList.contains('active')) {
+                        this.armR.rotation.x = -s * 0.8;
+                    }
+                    this.legL.rotation.x = -s * 0.7;
+                    this.legR.rotation.x = s * 0.7;
+                    this.root.position.y = Math.abs(Math.cos(this.animTimer)) * (0.15 * speedMult);
+                } else {
+                    this.animTimer = 0;
+                    const l = 0.15;
+                    this.armL.rotation.x += (0 - this.armL.rotation.x) * l;
+                    if (!document.getElementById('aim-btn').classList.contains('active')) {
+                        this.armR.rotation.x += (0 - this.armR.rotation.x) * l;
+                    }
+                    this.legL.rotation.x += (0 - this.legL.rotation.x) * l;
+                    this.legR.rotation.x += (0 - this.legR.rotation.x) * l;
+                    this.root.position.y += (0 - this.root.position.y) * l;
+                }
+                
+                if (this.slideMesh) {
+                    this.slideOffset *= 0.7;
+                    this.slideMesh.position.z = this.originalSlidePos.z - this.slideOffset * 0.3;
+                }
+            }
+            
+            showMuzzleFlash() {
+                if (this.muzzleFlashObj) {
+                    this.muzzleFlashObj.visible = true;
+                    this.muzzleFlashObj.rotation.z = Math.random() * Math.PI;
+                    this.muzzleFlashObj.scale.setScalar(1.0 + Math.random() * 0.5);
+                    setTimeout(() => { if (this.muzzleFlashObj) this.muzzleFlashObj.visible = false; }, 70);
+                }
+                this.slideOffset = 0.25;
+            }
+        }
+
+        // ==========================================
+        // МЕНЕДЖЕР МУЛЬТИПЛЕЕРА (СЕТЕВАЯ ЧАСТЬ)
+        // ==========================================
+        class MultiplayerManager {
+            constructor(game) {
+                this.game = game;
+                this.socket = null;
+                this.playerId = null;
+                this.health = 100;
+                this.remotePlayers = new Map(); // id -> { hero, hitbox, targetPosition, targetRotationY, isMoving, aiming, health }
+                this.remoteHitboxes = []; // массив мешей для рейкаста
+
+                this.updateInterval = 50; // мс отправки позиции
+                this.lastUpdateTime = 0;
+
+                this.connect();
+            }
+
+            connect() {
+                // Подключение к серверу (замените IP/порт на свои)
+                this.socket = new WebSocket('ws://localhost:8080');
+                this.socket.onopen = () => {
+                    console.log('Соединение установлено');
+                    this.health = 100;
+                    document.getElementById('health-value').textContent = this.health;
+                };
+                this.socket.onmessage = (event) => {
+                    const msg = JSON.parse(event.data);
+                    this.handleMessage(msg);
+                };
+                this.socket.onclose = () => {
+                    console.log('Соединение закрыто, переподключение через 2с...');
+                    setTimeout(() => this.connect(), 2000);
+                };
+                this.socket.onerror = (err) => console.error('WebSocket error', err);
+            }
+
+            send(data) {
+                if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                    this.socket.send(JSON.stringify(data));
+                }
+            }
+
+            handleMessage(msg) {
+                switch (msg.type) {
+                    case 'init':
+                        this.playerId = msg.id;
+                        this.health = msg.health;
+                        document.getElementById('health-value').textContent = this.health;
+                        this.game.hero.root.position.set(msg.position.x, msg.position.y, msg.position.z);
+                        break;
+                    case 'players':
+                        msg.list.forEach(p => this.addRemotePlayer(p));
+                        break;
+                    case 'player_joined':
+                        this.addRemotePlayer(msg);
+                        break;
+                    case 'player_update':
+                        this.updateRemotePlayer(msg);
+                        break;
+                    case 'player_left':
+                        this.removeRemotePlayer(msg.id);
+                        break;
+                    case 'health_update':
+                        this.health = msg.health;
+                        document.getElementById('health-value').textContent = this.health;
+                        if (this.health <= 0) {
+                            // Локальный игрок умер, ждём респаун
+                            // Можно визуально скрыть модель или оставить
+                        }
+                        break;
+                    case 'player_damaged':
+                        // Обновить здоровье удалённого игрока
+                        if (this.remotePlayers.has(msg.id)) {
+                            this.remotePlayers.get(msg.id).health = msg.health;
+                        }
+                        break;
+                    case 'player_killed':
+                        // Можно эффект
+                        break;
+                    case 'player_respawned':
+                        if (msg.id === this.playerId) {
+                            this.health = msg.health;
+                            document.getElementById('health-value').textContent = this.health;
+                            this.game.hero.root.position.set(msg.position.x, msg.position.y, msg.position.z);
+                        } else if (this.remotePlayers.has(msg.id)) {
+                            const rp = this.remotePlayers.get(msg.id);
+                            rp.targetPosition.set(msg.position.x, msg.position.y, msg.position.z);
+                            rp.hero.root.position.copy(rp.targetPosition);
+                            rp.health = msg.health;
+                        }
+                        break;
+                    case 'respawn':
+                        if (this.playerId) {
+                            this.health = msg.health;
+                            document.getElementById('health-value').textContent = this.health;
+                            this.game.hero.root.position.set(msg.position.x, msg.position.y, msg.position.z);
+                        }
+                        break;
+                }
+            }
+
+            addRemotePlayer(data) {
+                if (data.id === this.playerId || this.remotePlayers.has(data.id)) return;
+                // Свои материалы для отличия (красноватый оттенок)
+                const remoteMats = {
+                    skin: new THREE.MeshLambertMaterial({ color: 0xffccaa }),
+                    cloth: new THREE.MeshLambertMaterial({ color: 0x552222 }),
+                    accent: new THREE.MeshLambertMaterial({ color: 0xff6666 }),
+                    hair: new THREE.MeshLambertMaterial({ color: 0x331100 }),
+                    white: new THREE.MeshLambertMaterial({ color: 0xffffff }),
+                    black: new THREE.MeshLambertMaterial({ color: 0x000000 }),
+                    shoe: new THREE.MeshLambertMaterial({ color: 0x111111 }),
+                    gunMetal: new THREE.MeshStandardMaterial({ color: 0x2a2a2a }),
+                    gunGrip: new THREE.MeshStandardMaterial({ color: 0x3a1e0a }),
+                    gunSlide: new THREE.MeshStandardMaterial({ color: 0x444444 }),
+                    muzzleFlash: new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.95 })
+                };
+                const hero = new AdvancedVoxelHero(this.game.scene, remoteMats);
+                hero.root.position.set(data.position.x, data.position.y, data.position.z);
+                hero.root.rotation.y = data.rotationY || 0;
+
+                // Хитбокс для рейкаста (простой куб)
+                const hitboxGeom = new THREE.BoxGeometry(1, 2.2, 1);
+                const hitboxMat = new THREE.MeshBasicMaterial({ visible: false });
+                const hitbox = new THREE.Mesh(hitboxGeom, hitboxMat);
+                hitbox.position.y = 1.1;
+                hero.root.add(hitbox);
+                this.remoteHitboxes.push(hitbox);
+
+                this.remotePlayers.set(data.id, {
+                    hero,
+                    hitbox,
+                    targetPosition: new THREE.Vector3(data.position.x, data.position.y, data.position.z),
+                    targetRotationY: data.rotationY || 0,
+                    isMoving: data.isMoving || false,
+                    aiming: data.aiming || false,
+                    health: data.health || 100
+                });
+            }
+
+            updateRemotePlayer(data) {
+                const rp = this.remotePlayers.get(data.id);
+                if (!rp) return;
+                rp.targetPosition.set(data.position.x, data.position.y, data.position.z);
+                rp.targetRotationY = data.rotationY;
+                rp.isMoving = data.isMoving;
+                rp.aiming = data.aiming;
+                rp.health = data.health;
+            }
+
+            removeRemotePlayer(id) {
+                const rp = this.remotePlayers.get(id);
+                if (!rp) return;
+                this.game.scene.remove(rp.hero.root);
+                const idx = this.remoteHitboxes.indexOf(rp.hitbox);
+                if (idx !== -1) this.remoteHitboxes.splice(idx, 1);
+                this.remotePlayers.delete(id);
+            }
+
+            update(dt) {
+                // Интерполяция удалённых игроков
+                this.remotePlayers.forEach((rp, id) => {
+                    rp.hero.root.position.lerp(rp.targetPosition, 0.2);
+                    let diff = rp.targetRotationY - rp.hero.root.rotation.y;
+                    while (diff < -Math.PI) diff += Math.PI*2;
+                    while (diff > Math.PI) diff -= Math.PI*2;
+                    rp.hero.root.rotation.y += diff * 0.2;
+                    rp.hero.animate(rp.isMoving, dt, false); // всегда бег? можно без спринта
+                });
+
+                // Отправка своего состояния с фиксированной частотой
+                const now = performance.now();
+                if (now - this.lastUpdateTime > this.updateInterval && this.playerId) {
+                    this.lastUpdateTime = now;
+                    const pos = this.game.hero.root.position;
+                    this.send({
+                        type: 'update',
+                        position: { x: pos.x, y: pos.y, z: pos.z },
+                        rotationY: this.game.hero.root.rotation.y,
+                        isMoving: this.game.input.moveDir.length() > 0.1,
+                        aiming: this.game.input.isAiming
+                    });
+                }
+            }
+
+            // Вызывается при выстреле, проверяет попадание в удалённых игроков
+            checkHit(origin, direction) {
+                if (!this.playerId) return;
+                const raycaster = new THREE.Raycaster(origin, direction);
+                const intersects = raycaster.intersectObjects(this.remoteHitboxes);
+                if (intersects.length > 0) {
+                    const hit = intersects[0].object;
+                    for (let [id, rp] of this.remotePlayers) {
+                        if (rp.hitbox === hit) {
+                            // Отправляем hit на сервер
+                            this.send({
+                                type: 'hit',
+                                targetId: id,
+                                damage: 50
+                            });
+                            // Локальный эффект попадания (кровь/искры)
+                            this.game.fxManager.spawnImpact(intersects[0].point, intersects[0].face.normal);
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+        }
+
+        // ==========================================
+        // ЯДРО ИГРЫ (СВОБОДНЫЙ ВЗГЛЯД, МУЛЬТИПЛЕЕР)
+        // ==========================================
+        class Game {
+            constructor() {
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x87CEEB);
+                this.scene.fog = new THREE.Fog(0x87CEEB, 35, 90);
+
+                this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.outputEncoding = THREE.sRGBEncoding;
+                document.getElementById('render-container').appendChild(this.renderer.domElement);
+
+                this.camRadius = 12.0; 
+                this.camTheta = 0;
+                this.camPhi = Math.PI / 3.0;
+                
+                this.collidables = [];
+                this.shootableMeshes = [];
+
+                this.initLights();
+                this.initWorld();
+                
+                this.input = new MultiTouchController();
+                this.hero = new AdvancedVoxelHero(this.scene);
+                this.fxManager = new CombatFXManager(this.scene);
+                this.audioSystem = new TacticalAudioSystem();
+                
+                this.spawnPlayerSafe();
+                
+                this.clock = new THREE.Clock();
+                this.crosshair = document.getElementById('crosshair');
+                
+                this.aimFov = 50;
+                this.normalFov = 70;
+                this.aimOffset = new THREE.Vector3(-1.0, 0.65, 0.5);
+                
+                this.recoilOffset = new THREE.Vector3();
+                this.shakeIntensity = 0;
+                this.recoilRotation = new THREE.Vector2();
+                
+                this.fireCooldown = 0;
+                this.fireRate = 0.18;
+                
+                this.editManager = new EditModeManager(document.getElementById('game-interface'), this.input);
+                
+                // Инициализация мультиплеера
+                this.multiplayer = new MultiplayerManager(this);
+                
+                window.addEventListener('resize', () => this.onResize());
+                this.loop();
+            }
+            
+            spawnPlayerSafe() {
+                const maxAttempts = 100;
+                for (let i = 0; i < maxAttempts; i++) {
+                    const x = (Math.random() - 0.5) * 160;
+                    const z = (Math.random() - 0.5) * 160;
+                    const testPos = new THREE.Vector3(x, 0, z);
+                    if (!this.checkCollision(testPos, 1.2)) {
+                        this.hero.root.position.set(x, 0, z);
+                        return;
+                    }
+                }
+                this.hero.root.position.set(20, 0, 20);
+            }
+
+            initLights() {
+                const sun = new THREE.DirectionalLight(0xfff5e6, 1.3);
+                sun.position.set(25, 30, 20);
+                sun.castShadow = true;
+                sun.receiveShadow = true;
+                sun.shadow.mapSize.width = 2048;
+                sun.shadow.mapSize.height = 2048;
+                sun.shadow.bias = -0.0005;
+                const d = 20;
+                sun.shadow.camera.left = -d;
+                sun.shadow.camera.right = d;
+                sun.shadow.camera.top = d;
+                sun.shadow.camera.bottom = -d;
+                sun.shadow.camera.near = 1;
+                sun.shadow.camera.far = 50;
+                sun.shadow.camera.updateProjectionMatrix();
+                this.scene.add(sun);
+                this.scene.add(new THREE.AmbientLight(0x404060, 0.5));
+                const backLight = new THREE.DirectionalLight(0xccddff, 0.5);
+                backLight.position.set(-15, 18, -15);
+                backLight.castShadow = true;
+                backLight.shadow.mapSize.width = 1024;
+                backLight.shadow.mapSize.height = 1024;
+                this.scene.add(backLight);
+                const fillLight = new THREE.PointLight(0x88aaff, 0.4);
+                fillLight.position.set(5, 8, 15);
+                this.scene.add(fillLight);
+            }
+
+            initWorld() {
+                const groundSize = 240;
+                const grassMat = new THREE.MeshStandardMaterial({ color: 0x4a8e3e, roughness: 0.9 });
+                const ground = new THREE.Mesh(new THREE.PlaneGeometry(groundSize, groundSize), grassMat);
+                ground.rotation.x = -Math.PI / 2;
+                ground.receiveShadow = true;
+                ground.position.y = 0;
+                this.scene.add(ground);
+                this.shootableMeshes.push(ground);
+                const gridHelper = new THREE.GridHelper(groundSize, 40, 0x88aa88, 0x446644);
+                gridHelper.position.y = 0.02;
+                this.scene.add(gridHelper);
+
+                const createWall = (w, h, d, color, pos, rotY = 0) => {
+                    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
+                    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+                    mesh.position.set(pos.x, pos.y, pos.z);
+                    mesh.rotation.y = rotY;
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    this.scene.add(mesh);
+                    this.collidables.push({
+                        min: new THREE.Vector3(pos.x - w/2, 0, pos.z - d/2),
+                        max: new THREE.Vector3(pos.x + w/2, h, pos.z + d/2)
+                    });
+                    this.shootableMeshes.push(mesh);
+                    return mesh;
+                };
+
+                const wallHeight = 5.5, wallThick = 2.0, borderOffset = groundSize/2 - wallThick/2;
+                const concreteColor = 0x8a9098;
+                createWall(groundSize, wallHeight, wallThick, concreteColor, new THREE.Vector3(0, wallHeight/2, -borderOffset), 0);
+                createWall(groundSize, wallHeight, wallThick, concreteColor, new THREE.Vector3(0, wallHeight/2, borderOffset), 0);
+                createWall(wallThick, wallHeight, groundSize, concreteColor, new THREE.Vector3(-borderOffset, wallHeight/2, 0), 0);
+                createWall(wallThick, wallHeight, groundSize, concreteColor, new THREE.Vector3(borderOffset, wallHeight/2, 0), 0);
+
+                const pillarMat = new THREE.MeshStandardMaterial({ color: 0x6a7078 });
+                const addPillar = (x, z) => {
+                    const w = 2.5, h = wallHeight+0.8;
+                    const pillar = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), pillarMat);
+                    pillar.position.set(x, h/2, z);
+                    pillar.castShadow = true; pillar.receiveShadow = true;
+                    this.scene.add(pillar);
+                    this.collidables.push({ min: new THREE.Vector3(x-w/2,0,z-w/2), max: new THREE.Vector3(x+w/2,h,z+w/2) });
+                    this.shootableMeshes.push(pillar);
+                };
+                addPillar(-borderOffset, -borderOffset); addPillar( borderOffset, -borderOffset);
+                addPillar(-borderOffset,  borderOffset); addPillar( borderOffset,  borderOffset);
+
+                const obstacleColor = 0x6e7a82, oh = 4.0, ot = 1.8;
+                createWall(ot, oh, 50, obstacleColor, new THREE.Vector3(0, oh/2, 15), 0);
+                createWall(ot, oh, 50, obstacleColor, new THREE.Vector3(0, oh/2, -35), 0);
+                createWall(65, oh, ot, obstacleColor, new THREE.Vector3(-20, oh/2, -15), 0);
+                createWall(30, oh, ot, obstacleColor, new THREE.Vector3(40, oh/2, 25), 0.4);
+                createWall(30, oh, ot, obstacleColor, new THREE.Vector3(-40, oh/2, -25), -0.3);
+                createWall(ot, oh, 35, obstacleColor, new THREE.Vector3(25, oh/2, -45), 0);
+                createWall(ot, oh, 35, obstacleColor, new THREE.Vector3(-30, oh/2, 40), 0);
+
+                const lowBlockMat = new THREE.MeshStandardMaterial({ color: 0x5d6a75 });
+                for (let i = 0; i < 10; i++) {
+                    const w = 4.0, h = 1.4;
+                    const block = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), lowBlockMat);
+                    const x = -45 + i*14, z = -55 + (i%4)*18;
+                    block.position.set(x, h/2, z);
+                    block.castShadow = true; block.receiveShadow = true;
+                    this.scene.add(block);
+                    this.collidables.push({ min: new THREE.Vector3(x-w/2,0,z-w/2), max: new THREE.Vector3(x+w/2,h,z+w/2) });
+                    this.shootableMeshes.push(block);
+                }
+            }
+
+            checkCollision(pos, radius = 0.9) {
+                for (let c of this.collidables) {
+                    const closest = new THREE.Vector3(
+                        Math.max(c.min.x, Math.min(pos.x, c.max.x)),
+                        Math.max(c.min.y, Math.min(pos.y, c.max.y)),
+                        Math.max(c.min.z, Math.min(pos.z, c.max.z))
+                    );
+                    if (closest.distanceToSquared(pos) < radius * radius) return true;
+                }
+                return false;
+            }
+
+            onResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            fireWeapon() {
+                this.hero.showMuzzleFlash();
+                this.audioSystem.playGunshot();
+                this.shakeIntensity = 0.35;
+                this.recoilRotation.y += (Math.random() - 0.5) * 0.08;
+                this.recoilRotation.x += 0.04 + Math.random() * 0.06;
+                
+                const muzzlePos = new THREE.Vector3();
+                this.hero.muzzlePoint.getWorldPosition(muzzlePos);
+
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+                
+                // Сначала проверяем попадание в удалённых игроков
+                const hitRemote = this.multiplayer.checkHit(muzzlePos, raycaster.ray.direction);
+                
+                const intersects = raycaster.intersectObjects(this.shootableMeshes);
+                let targetPos;
+                if (intersects.length > 0) {
+                    const hit = intersects[0];
+                    targetPos = hit.point;
+                    if (!hitRemote) { // Если не попали в игрока, то эффекты на стене
+                        this.fxManager.spawnImpact(hit.point, hit.face.normal);
+                        this.fxManager.spawnBulletHole(hit.point, hit.face.normal);
+                    }
+                } else {
+                    targetPos = raycaster.ray.at(120, new THREE.Vector3());
+                }
+                this.fxManager.spawnTracer(muzzlePos, targetPos);
+            }
+
+            update(dt) {
+                if (this.input.camDelta.lengthSq() > 0) {
+                    this.camTheta -= this.input.camDelta.x * 0.006;
+                    this.camPhi -= this.input.camDelta.y * 0.006;
+                    this.camPhi = Math.max(0.05, Math.min(Math.PI - 0.05, this.camPhi));
+                    this.input.camDelta.set(0, 0);
+                }
+
+                const isMoving = this.input.moveDir.length() > 0.1;
+                const speed = (this.input.isSprinting ? 9.5 : 5.8) * dt;
+                
+                if (isMoving) {
+                    const angle = this.camTheta + Math.atan2(this.input.moveDir.x, this.input.moveDir.y);
+                    const moveX = Math.sin(angle) * speed;
+                    const moveZ = Math.cos(angle) * speed;
+                    const pos = this.hero.root.position;
+                    let newX = pos.x + moveX, newZ = pos.z + moveZ;
+                    if (!this.checkCollision(new THREE.Vector3(newX, pos.y, pos.z))) pos.x = newX;
+                    if (!this.checkCollision(new THREE.Vector3(pos.x, pos.y, newZ))) pos.z = newZ;
+                    
+                    let diff = angle - this.hero.root.rotation.y;
+                    while (diff < -Math.PI) diff += Math.PI*2;
+                    while (diff > Math.PI) diff -= Math.PI*2;
+                    this.hero.root.rotation.y += diff * 0.2;
+                }
+
+                this.hero.animate(isMoving, dt, this.input.isSprinting);
+
+                const aiming = this.input.isAiming;
+                this.crosshair.style.display = aiming ? 'block' : 'none';
+                const targetFov = aiming ? this.aimFov : this.normalFov;
+                this.camera.fov += (targetFov - this.camera.fov) * 0.12;
+                this.camera.updateProjectionMatrix();
+
+                if (aiming) {
+                    let targetRot = this.camTheta + Math.PI;
+                    let diff = targetRot - this.hero.root.rotation.y;
+                    while (diff < -Math.PI) diff += Math.PI*2;
+                    while (diff > Math.PI) diff -= Math.PI*2;
+                    this.hero.root.rotation.y += diff * 0.15;
+                }
+
+                if (this.fireCooldown > 0) this.fireCooldown -= dt;
+                if (this.input.isFiring && this.fireCooldown <= 0 && this.multiplayer.health > 0) {
+                    this.fireCooldown = this.fireRate;
+                    this.fireWeapon();
+                }
+                
+                this.fxManager.update(dt);
+
+                this.shakeIntensity *= 0.75;
+                this.recoilRotation.lerp(new THREE.Vector2(0, 0), 0.2);
+                
+                const shakeX = (Math.random() - 0.5) * this.shakeIntensity;
+                const shakeY = (Math.random() - 0.5) * this.shakeIntensity;
+
+                const heroPos = this.hero.root.position.clone();
+                heroPos.y += 1.4;
+
+                if (aiming) {
+                    const forward = new THREE.Vector3(
+                        -Math.sin(this.camTheta) * Math.sin(this.camPhi),
+                        -Math.cos(this.camPhi),
+                        -Math.cos(this.camTheta) * Math.sin(this.camPhi)
+                    ).normalize();
+                    const right = new THREE.Vector3(-Math.cos(this.camTheta), 0, Math.sin(this.camTheta));
+                    const up = new THREE.Vector3(0, 1, 0);
+                    
+                    const recoilForward = forward.clone().add(
+                        right.clone().multiplyScalar(this.recoilRotation.y)
+                    ).add(up.clone().multiplyScalar(this.recoilRotation.x)).normalize();
+                    
+                    const offset = right.clone().multiplyScalar(this.aimOffset.x)
+                                    .add(up.clone().multiplyScalar(this.aimOffset.y))
+                                    .add(forward.clone().multiplyScalar(this.aimOffset.z));
+                    
+                    let camPos = heroPos.clone().add(offset);
+                    camPos.x += shakeX; camPos.y += shakeY;
+                    this.camera.position.copy(camPos);
+                    
+                    const lookAt = heroPos.clone().add(recoilForward.multiplyScalar(15));
+                    this.camera.lookAt(lookAt);
+                } else {
+                    const ox = this.camRadius * Math.sin(this.camPhi) * Math.sin(this.camTheta);
+                    const oy = this.camRadius * Math.cos(this.camPhi);
+                    const oz = this.camRadius * Math.sin(this.camPhi) * Math.cos(this.camTheta);
+                    let camPos = new THREE.Vector3(heroPos.x + ox, heroPos.y + oy + 1.8, heroPos.z + oz);
+                    camPos.x += shakeX; camPos.y += shakeY;
+                    this.camera.position.copy(camPos);
+                    this.camera.lookAt(heroPos.x, heroPos.y + 0.9, heroPos.z);
+                }
+
+                // Сетевое обновление
+                this.multiplayer.update(dt);
+            }
+
+            loop() {
+                requestAnimationFrame(() => this.loop());
+                this.update(this.clock.getDelta());
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        new Game();
+    </script>
+</body>
+</html>
