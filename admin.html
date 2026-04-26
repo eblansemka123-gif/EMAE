@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>DolWall Admin</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #0a0a0a;
+            --gold: #c19b56;
+            --gold-light: #f4d093;
+            --white: #ffffff;
+            --bg: #0c0c0c;
+            --card-bg: #1a1a1a;
+            --transition: all 0.7s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body {
+            background: var(--bg);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+            transition: background 0.8s;
+        }
+        /* Анимации */
+        @keyframes fadeSlideUp {
+            0% { opacity: 0; transform: translateY(60px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeSlideDown {
+            0% { opacity: 0; transform: translateY(-30px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes scaleUp {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes slideInRight {
+            0% { transform: translateX(100%); opacity: 0; }
+            100% { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(193, 155, 86, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(193, 155, 86, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(193, 155, 86, 0); }
+        }
+
+        /* Контейнер */
+        .admin-container {
+            width: 100%;
+            max-width: 900px;
+            padding: 20px;
+            text-align: center;
+        }
+        .logo {
+            font-size: clamp(2rem, 8vw, 3.5rem);
+            font-weight: 900;
+            letter-spacing: 10px;
+            margin-bottom: 60px;
+            animation: scaleUp 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .logo span { color: var(--gold); }
+
+        /* Кнопки */
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            align-items: center;
+            animation: fadeSlideUp 0.9s cubic-bezier(0.19, 1, 0.22, 1) 0.3s both;
+        }
+        .admin-btn {
+            width: 280px;
+            padding: 22px 0;
+            font-size: 1.1rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            border-radius: 60px;
+            border: 2px solid var(--gold);
+            background: transparent;
+            color: var(--gold);
+            cursor: pointer;
+            transition: all 0.4s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .admin-btn:hover {
+            background: var(--gold);
+            color: #000;
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(193, 155, 86, 0.3);
+        }
+        .admin-btn.test-btn {
+            border-color: var(--gold-light);
+            color: var(--gold-light);
+        }
+        .admin-btn.test-btn:hover { background: var(--gold-light); color: #000; }
+
+        /* Панель заказов (скрыта изначально) */
+        .orders-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 100%;
+            max-width: 600px;
+            height: 100%;
+            background: var(--card-bg);
+            border-left: 1px solid var(--gold);
+            z-index: 100;
+            transform: translateX(100%);
+            transition: transform 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+            padding: 30px 25px;
+            overflow-y: auto;
+            box-shadow: -10px 0 40px rgba(0,0,0,0.5);
+        }
+        .orders-panel.open {
+            transform: translateX(0);
+        }
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        .panel-header h2 {
+            font-weight: 900;
+            font-size: 1.8rem;
+            letter-spacing: 2px;
+        }
+        .close-panel {
+            font-size: 2rem;
+            cursor: pointer;
+            color: #fff;
+            transition: 0.3s;
+        }
+        .close-panel:hover { color: var(--gold); }
+        .orders-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .order-card {
+            background: #111;
+            border-radius: 25px;
+            padding: 20px;
+            border: 1px solid #333;
+            transition: all 0.3s;
+            animation: slideInRight 0.4s ease;
+        }
+        .order-card:hover { border-color: var(--gold); }
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .order-id {
+            background: var(--gold);
+            color: #000;
+            padding: 5px 18px;
+            border-radius: 30px;
+            font-weight: 900;
+        }
+        .order-date { color: #aaa; font-size: 0.85rem; }
+        .order-info p { margin: 8px 0; font-size: 0.9rem; display: flex; align-items: center; gap: 10px; }
+        .order-items { margin-top: 15px; display: flex; flex-wrap: wrap; gap: 10px; }
+        .order-item-thumb {
+            width: 60px; height: 60px; border-radius: 15px; background-size: cover;
+            background-position: center; border: 1px solid #444; position: relative;
+        }
+        .order-item-thumb::after {
+            content: attr(data-qty); position: absolute; bottom: -5px; right: -8px;
+            background: var(--gold); color: #000; font-weight: 900; font-size: 0.75rem;
+            padding: 2px 8px; border-radius: 20px;
+        }
+        .total-sum {
+            font-size: 1.5rem; font-weight: 900; color: var(--gold); margin-top: 15px;
+        }
+        .empty-history {
+            text-align: center; color: #777; font-size: 1rem; margin-top: 50px;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed; top: 24px; right: 24px; background: rgba(0,0,0,0.85); color: white;
+            padding: 16px 24px; border-radius: 60px; font-weight: 600; z-index: 11000;
+            display: flex; align-items: center; gap: 14px;
+            border-left: 5px solid var(--gold); backdrop-filter: blur(8px);
+            animation: fadeSlideDown 0.4s ease; box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            pointer-events: none;
+        }
+        @media (max-width: 768px) {
+            .orders-panel { max-width: 100%; }
+            .admin-btn { width: 240px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="logo">DOL<span>WALL</span> ADMIN</div>
+        <div class="btn-group" id="buttonGroup">
+            <button class="admin-btn test-btn" onclick="sendTestNotification()">
+                <i class="fa-solid fa-paper-plane"></i> Контрольное уведомление
+            </button>
+            <button class="admin-btn" onclick="openOrdersPanel()">
+                <i class="fa-solid fa-list-check"></i> ЗАКАЗЫ
+            </button>
+        </div>
+    </div>
+
+    <!-- Слайд-панель с заказами -->
+    <div class="orders-panel" id="ordersPanel">
+        <div class="panel-header">
+            <h2><i class="fa-solid fa-boxes-stacked" style="color:var(--gold); margin-right:10px;"></i>Заказы</h2>
+            <i class="fa-solid fa-xmark close-panel" onclick="closeOrdersPanel()"></i>
+        </div>
+        <div class="orders-list" id="ordersList"></div>
+    </div>
+
+    <script>
+        // ----------------------------------- КОНФИГУРАЦИЯ -----------------------------------
+        const BARK_KEY = "2mfG6468JsmXaVLaLETob";          // твой ключ Bark
+        const BARK_URL = "https://api.day.app";
+        const NTFY_CHANNEL = "dolwall_orders";               // общий канал для заказов
+        const ITEM_PRICE = 6600;                             // цена за единицу
+
+        // Товары (копия из каталога, чтобы показывать картинки)
+        const products = [
+            { id:1, name:"Черное золото", img:"https://img.freepik.com/premium-vector/black-golden-marble-background-with-smudge-grey-effect-abstract-background_1051181-845.jpg" },
+            { id:2, name:"Классик Голд", img:"https://img.santehnica.ru/files/images/resized/products/1/4/14141410-keramicheskaya-plitka-newtrend-intensity-light-wt36its15-30-x-60-sm-glyantsevaya-tsvet-beliy.1200x1200.jpg" },
+            { id:3, name:"Тянь Шань", img:"https://conceptceramic.ru/image/catalog/product/284/314625.jpg" },
+            { id:4, name:"Гранит", img:"https://ir.ozone.ru/s3/multimedia-1-h/w1200/7077049289.jpg" },
+            { id:5, name:"Юпитер матовый", img:"https://www.grouppartner.ru/upload/iblock/255/q3c2fmutdj8028yfzasd0tol4ah6t3nk.jpeg" },
+            { id:6, name:"Роял матовый", img:"https://гибкий-стиль.рф/image/cache/catalog/tov-new/royal-400x600.jpeg" },
+            { id:7, name:"Оникс матовый", img:"https://гибкий-стиль.рф/image/cache/catalog/tov-new/onix-400x600.jpeg" },
+            { id:8, name:"Капучино матовый", img:"https://гибкий-стиль.рф/image/cache/catalog/tov-new/capucino-400x600.jpeg" },
+            { id:9, name:"Нежность", img:"https://гибкий-стиль.рф/image/cache/catalog/tov-new/nezhnost-400x600.jpeg" },
+            { id:10, name:"Млечный путь", img:"https://ekaterinburg.novayaplitka.ru/upload/iblock/e8a/0jyyfdtel0zyutlkyy10no12apngd2ec.jpg" },
+            { id:11, name:"Грация", img:"https://avatars.mds.yandex.net/get-goods_pic/14294964/hat4bd9cb453d8e3cf2d9616b6f0a002aa6/orig" },
+            { id:12, name:"Зебра", img:"https://гибкий-стиль.рф/image/cache/catalog/tov-new/zebra-400x600.jpeg" },
+            { id:13, name:"Олимп", img:"https://avatars.mds.yandex.net/get-goods_pic/8171279/hatf41e07c6db79fe3a67504d18db95a07f/orig" },
+            { id:14, name:"Луна матовый", img:"https://avatars.mds.yandex.net/get-goods_pic/12824671/hat9d0e5ad877b6af971e5bb0a8c6139064/orig" },
+            { id:15, name:"Сильвер", img:"https://avatars.mds.yandex.net/get-goods_pic/6691814/hatb9964c8c57e4f437e1c4b815677e3b19/orig" },
+            { id:16, name:"Классик", img:"https://avatars.mds.yandex.net/get-goods_pic/15224382/hatf9f2c4516e58183c79ccd5b36e9dff85/orig" },
+            { id:17, name:"Серафинид", img:"https://гибкий-стиль.рф/image/cache/catalog/tov-new/serafinit-400x600.jpeg" },
+            { id:18, name:"Плутон матовый", img:"https://гибкий-стиль.рф/image/cache/catalog/tov-new/pluton-1200x800.jpeg" },
+            { id:19, name:"Лагуна матовая", img:"https://гибкий-стиль.рф/image/cache/catalog/tov-new/laguna-400x600.jpeg" },
+            { id:20, name:"Белый Мрамор", img:"https://гибкий-стиль.рф/image/cache/catalog/tov-new/royal-1200x800.jpeg" }
+        ];
+
+        // Хранилище заказов (в памяти + localStorage)
+        let orders = [];
+
+        // Инициализация при загрузке
+        window.addEventListener('DOMContentLoaded', () => {
+            // Восстанавливаем историю из localStorage
+            const saved = localStorage.getItem('dolwall_admin_orders');
+            if (saved) {
+                try { orders = JSON.parse(saved); } catch(e){ orders = []; }
+            }
+            // Пока не показываем панель, только кнопки (анимация уже в CSS)
+        });
+
+        // ---------------------------- ОТКРЫТИЕ ПАНЕЛИ ЗАКАЗОВ ----------------------------
+        function openOrdersPanel() {
+            document.getElementById('ordersPanel').classList.add('open');
+            renderOrders();
+            // Запускаем слушатель ntfy (если ещё не активен)
+            startListening();
+        }
+
+        function closeOrdersPanel() {
+            document.getElementById('ordersPanel').classList.remove('open');
+        }
+
+        // ---------------------------- ОТОБРАЖЕНИЕ ЗАКАЗОВ ----------------------------
+        function renderOrders() {
+            const list = document.getElementById('ordersList');
+            if (!orders.length) {
+                list.innerHTML = '<div class="empty-history">Нет заказов. Ожидайте новые...</div>';
+                return;
+            }
+            // Сортируем: новые сверху
+            const sorted = [...orders].sort((a,b) => b.timestamp - a.timestamp);
+            list.innerHTML = sorted.map(order => {
+                // Формируем карточки товаров
+                const itemsHtml = order.items.map(item => {
+                    const prod = products.find(p => p.name === item.name);
+                    const imgUrl = prod ? prod.img : '';
+                    return `<div class="order-item-thumb" style="background-image:url('${imgUrl}');" data-qty="${item.qty}"></div>`;
+                }).join('');
+                const date = new Date(order.timestamp).toLocaleString('ru-RU');
+                return `
+                <div class="order-card">
+                    <div class="order-header">
+                        <span class="order-id">#${order.id}</span>
+                        <span class="order-date">${date}</span>
+                    </div>
+                    <div class="order-info">
+                        <p><i class="fa-solid fa-user"></i> ${order.name}</p>
+                        <p><i class="fa-solid fa-phone"></i> ${order.phone}</p>
+                        <p><i class="fa-solid fa-location-dot"></i> ${order.address}</p>
+                    </div>
+                    <div class="order-items">${itemsHtml}</div>
+                    <div class="total-sum">${order.sum.toLocaleString()} ₽</div>
+                </div>`;
+            }).join('');
+        }
+
+        // ---------------------------- СЛУШАТЕЛЬ NTFY ----------------------------
+        let eventSource = null;
+        function startListening() {
+            if (eventSource) return; // уже слушаем
+            eventSource = new EventSource(`https://ntfy.sh/${NTFY_CHANNEL}/sse`);
+            eventSource.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    // Ожидаем структуру: { id, name, phone, address, items, sum, timestamp }
+                    if (data.id && data.items) {
+                        // Проверяем, нет ли уже такого заказа
+                        if (!orders.find(o => o.id === data.id)) {
+                            data.timestamp = data.timestamp || Date.now();
+                            orders.push(data);
+                            localStorage.setItem('dolwall_admin_orders', JSON.stringify(orders));
+                            renderOrders();
+                            showToast(`Новый заказ #${data.id}`);
+                        }
+                    }
+                } catch (err) {
+                    console.log('Ошибка парсинга заказа:', err);
+                }
+            };
+            eventSource.onerror = () => {
+                // ntfy иногда разрывает, переподключаем через 5 сек
+                if (eventSource) eventSource.close();
+                eventSource = null;
+                setTimeout(startListening, 5000);
+            };
+        }
+
+        // ---------------------------- ТЕСТОВОЕ УВЕДОМЛЕНИЕ (BARK) ----------------------------
+        async function sendTestNotification() {
+            const title = encodeURIComponent('🧪 Тест админ-панели');
+            const body = encodeURIComponent('Контрольное уведомление DolWall Admin работает!');
+            await fetch(`${BARK_URL}/${BARK_KEY}/${title}/${body}`, { mode: 'no-cors' });
+            showToast('Тестовое уведомление отправлено');
+        }
+
+        // ---------------------------- ТОСТЫ ----------------------------
+        function showToast(msg) {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `<i class="fa-solid fa-circle-check" style="color:var(--gold); font-size:1.3rem;"></i> ${msg}`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Очистка истории (на своё усмотрение, можно добавить кнопку)
+        // function clearHistory() { orders = []; localStorage.removeItem('dolwall_admin_orders'); renderOrders(); }
+    </script>
+</body>
+</html>
